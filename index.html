@@ -1,15 +1,14 @@
+ const clientHtml = `
 <!DOCTYPE html>
 <html>
 <head>
     <title>고화질 영상 업로드</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-        /* ---------------------------------- */
-        /* CSS 스타일 시작 */
-        /* ---------------------------------- */
+        /* CSS 스타일 */
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f4f7f6; /* 연한 배경색 */
+            background-color: #f4f7f6;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -17,7 +16,7 @@
             margin: 0;
         }
         .container {
-            background-color: #ffffff; /* 흰색 컨테이너 */
+            background-color: #ffffff;
             padding: 40px;
             border-radius: 12px;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
@@ -39,7 +38,7 @@
             border-radius: 6px;
         }
         #uploadBtn {
-            background-color: #0070f3; /* Vercel 블루 색상 */
+            background-color: #0070f3;
             color: white;
             border: none;
             padding: 12px 25px;
@@ -72,9 +71,6 @@
             color: #0070f3;
             text-decoration: none;
         }
-        /* ---------------------------------- */
-        /* CSS 스타일 종료 */
-        /* ---------------------------------- */
     </style>
 </head>
 <body>
@@ -87,7 +83,7 @@
     </div>
 
     <script>
-        // 이 주소를 당신의 Worker 서브도메인 주소로 정확히 변경하세요!
+        // Worker 자신 (aespa.igangyun.com)으로 URL을 설정합니다.
         const WORKER_URL = 'https://aespa.igangyun.com'; 
         const fileInput = document.getElementById('fileInput');
         const statusElement = document.getElementById('status');
@@ -105,11 +101,11 @@
             }
 
             uploadBtn.disabled = true;
-            statusElement.textContent = `1. Signed URL 요청 중... (파일명: ${file.name})`;
+            statusElement.textContent = \`1. Signed URL 요청 중... (파일명: \${file.name})\`;
             
             try {
                 // 1단계: Worker에게 Signed URL 요청
-                const response = await fetch(`${WORKER_URL}/upload-url`, {
+                const response = await fetch(\`\${WORKER_URL}/upload-url\`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -120,15 +116,15 @@
 
                 if (!response.ok) {
                     const errorBody = await response.text();
-                    throw new Error(`Signed URL 요청 실패 (Status: ${response.status}, Error: ${errorBody})`);
+                    throw new Error(\`Signed URL 요청 실패 (Status: \${response.status}, Error: \${errorBody})\`);
                 }
 
                 const data = await response.json();
                 const { signedUrl, key, publicAccessUrl } = data;
 
-                statusElement.textContent = `2. R2에 직접 업로드 시작 (Worker를 거치지 않음). 속도는 인터넷 환경에 따라 다릅니다...`;
+                statusElement.textContent = \`2. R2에 직접 업로드 시작 (Worker를 거치지 않음). 속도는 인터넷 환경에 따라 다릅니다...\`;
                 
-                // 파일 크기가 크므로 진행률 표시 추가
+                // 파일 크기가 크므로 진행률 표시 추가 (XHR 사용)
                 const uploadXHR = new XMLHttpRequest();
                 uploadXHR.open('PUT', signedUrl, true);
                 uploadXHR.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
@@ -136,7 +132,7 @@
                 uploadXHR.upload.onprogress = (event) => {
                     if (event.lengthComputable) {
                         const percentComplete = (event.loaded / event.total) * 100;
-                        statusElement.textContent = `2. R2에 직접 업로드 중... ${percentComplete.toFixed(2)}% 완료`;
+                        statusElement.textContent = \`2. R2에 직접 업로드 중... \${percentComplete.toFixed(2)}% 완료\`;
                     }
                 };
                 
@@ -145,7 +141,7 @@
                         if (uploadXHR.status >= 200 && uploadXHR.status < 300) {
                             resolve();
                         } else {
-                            reject(new Error(`R2 직접 업로드 실패 (Status: ${uploadXHR.status})`));
+                            reject(new Error(\`R2 직접 업로드 실패 (Status: \${uploadXHR.status})\`));
                         }
                     };
                     uploadXHR.onerror = () => reject(new Error('네트워크 오류로 R2 업로드 실패'));
@@ -153,14 +149,14 @@
                 });
 
 
-                statusElement.innerHTML = `
+                statusElement.innerHTML = \`
                     <h3>✅ 업로드 성공!</h3>
-                    <p>저장된 파일 이름: ${key}</p>
-                    <p>다운로드 링크: <a href="${publicAccessUrl}" target="_blank">${publicAccessUrl}</a></p>
-                `;
+                    <p>저장된 파일 이름: \${key}</p>
+                    <p>다운로드 링크: <a href="\${publicAccessUrl}" target="_blank">\${publicAccessUrl}</a></p>
+                \`;
 
             } catch (error) {
-                statusElement.textContent = `🚨 업로드 중 오류 발생: ${error.message}`;
+                statusElement.textContent = \`🚨 업로드 중 오류 발생: \${error.message}\`;
                 console.error(error);
             } finally {
                 uploadBtn.disabled = false;
@@ -169,3 +165,4 @@
     </script>
 </body>
 </html>
+`;
