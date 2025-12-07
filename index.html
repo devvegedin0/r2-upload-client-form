@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>대용량 영상 업로드</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+        #status { margin-top: 20px; padding: 10px; border: 1px solid #ccc; white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+    <h2>10GB 영상 업로드 (R2 Signed URL 방식)</h2>
+    <input type="file" id="fileInput" accept="video/*">
+    <button onclick="uploadFile()" id="uploadBtn">업로드 시작</button>
+    
+    <div id="status">상태: 파일을 선택하고 '업로드 시작' 버튼을 눌러주세요.</div>
+
+    <script>
+        // 이 주소를 당신의 Worker 서브도메인 주소로 정확히 변경하세요!
+        const WORKER_URL = 'https://aespa.igangyun.com'; 
+        const fileInput = document.getElementById('fileInput');
+        const statusElement = document.getElementById('status');
+        const uploadBtn = document.getElementById('uploadBtn');
+
+        async function uploadFile() {
+            const file = fileInput.files[0];
+            if (!file) {
+                alert('업로드할 파일을 선택해주세요.');
+                return;
+            }
+
+            if (file.size > 10 * 1024 * 1024 * 1024) {
+                 statusElement.textContent = '경고: 파일 크기가 10GB를 초과합니다. 업로드에 매우 오랜 시간이 걸릴 수 있습니다.';
+            }
+
+            uploadBtn.disabled = true;
+            statusElement.textContent = `1. Signed URL 요청 중... (파일명: ${file.name})`;
+            
+            try {
+                // 1단계: Worker에게 Signed URL 요청
+                const response = await fetch(`${WORKER_URL}/upload-url`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        fileName: file.name,
+                        fileType: file.type || 'application/octet-stream',
+                    }),
+                });
+
+                if (!response.ok) {
+                    const errorBody = await response.text();
+                    throw new Error(`Signed URL 요청 실패 (Status: ${response.status}, Error: ${errorBody})`);
+                }
+
+                const data = await response.json();
+                const { signedUrl, key, publicAccessUrl } = data;
+
+                statusElement.textContent = `2. R2에 직접 업로드 시작 (Worker를 거치지 않음). 속도는 인터넷 환경에 따라 다릅니다...`;
+
+                // 2단계: Signed URL을 사용하여 R2에 파일 직접 PUT
+                const uploadResponse = await fetch(signedUrl, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': file.type || 'application/octet-stream',
+                    },
+                    body: file,
+                });
+
+                if (!uploadResponse.ok) {
+                    const errorText = await uploadResponse.text();
+                    throw new Error(`R2 직접 업로드 실패 (Status: ${uploadResponse.status}, Error: ${errorText})`);
+                }
+
+                statusElement.innerHTML = `
+                    <h3>✅ 업로드 성공!</h3>
+                    <p>저장된 파일 이름: ${key}</p>
+                    <p>다운로드 링크: <a href="${publicAccessUrl}" target="_blank">${publicAccessUrl}</a></p>
+                `;
+
+            } catch (error) {
+                statusElement.textContent = `🚨 업로드 중 오류 발생: ${error.message}`;
+                console.error(error);
+            } finally {
+                uploadBtn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>
