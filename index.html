@@ -1,19 +1,90 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>대용량 영상 업로드</title>
+    <title>고화질 영상 업로드</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-        body { font-family: sans-serif; padding: 20px; }
-        #status { margin-top: 20px; padding: 10px; border: 1px solid #ccc; white-space: pre-wrap; }
+        /* ---------------------------------- */
+        /* CSS 스타일 시작 */
+        /* ---------------------------------- */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6; /* 연한 배경색 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .container {
+            background-color: #ffffff; /* 흰색 컨테이너 */
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            max-width: 500px;
+            width: 90%;
+            text-align: center;
+        }
+        h2 {
+            color: #333;
+            margin-bottom: 25px;
+            font-weight: 600;
+        }
+        #fileInput {
+            display: block;
+            width: 100%;
+            margin-bottom: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+        }
+        #uploadBtn {
+            background-color: #0070f3; /* Vercel 블루 색상 */
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s ease;
+            width: 100%;
+        }
+        #uploadBtn:hover:not(:disabled) {
+            background-color: #005bb5;
+        }
+        #uploadBtn:disabled {
+            background-color: #b3d7ff;
+            cursor: not-allowed;
+        }
+        #status {
+            margin-top: 25px;
+            padding: 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            background-color: #f9f9f9;
+            text-align: left;
+            white-space: pre-wrap;
+            min-height: 50px;
+            color: #555;
+            font-size: 14px;
+        }
+        #status a {
+            color: #0070f3;
+            text-decoration: none;
+        }
+        /* ---------------------------------- */
+        /* CSS 스타일 종료 */
+        /* ---------------------------------- */
     </style>
 </head>
 <body>
-    <h2>10GB 영상 업로드 (R2 Signed URL 방식)</h2>
-    <input type="file" id="fileInput" accept="video/*">
-    <button onclick="uploadFile()" id="uploadBtn">업로드 시작</button>
-    
-    <div id="status">상태: 파일을 선택하고 '업로드 시작' 버튼을 눌러주세요.</div>
+    <div class="container">
+        <h2>10GB 영상 업로드 (R2 Signed URL 방식)</h2>
+        <input type="file" id="fileInput" accept="video/*">
+        <button onclick="uploadFile()" id="uploadBtn">업로드 시작</button>
+        
+        <div id="status">상태: 파일을 선택하고 '업로드 시작' 버튼을 눌러주세요.</div>
+    </div>
 
     <script>
         // 이 주소를 당신의 Worker 서브도메인 주소로 정확히 변경하세요!
@@ -56,20 +127,31 @@
                 const { signedUrl, key, publicAccessUrl } = data;
 
                 statusElement.textContent = `2. R2에 직접 업로드 시작 (Worker를 거치지 않음). 속도는 인터넷 환경에 따라 다릅니다...`;
-
-                // 2단계: Signed URL을 사용하여 R2에 파일 직접 PUT
-                const uploadResponse = await fetch(signedUrl, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': file.type || 'application/octet-stream',
-                    },
-                    body: file,
+                
+                // 파일 크기가 크므로 진행률 표시 추가
+                const uploadXHR = new XMLHttpRequest();
+                uploadXHR.open('PUT', signedUrl, true);
+                uploadXHR.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+                
+                uploadXHR.upload.onprogress = (event) => {
+                    if (event.lengthComputable) {
+                        const percentComplete = (event.loaded / event.total) * 100;
+                        statusElement.textContent = `2. R2에 직접 업로드 중... ${percentComplete.toFixed(2)}% 완료`;
+                    }
+                };
+                
+                await new Promise((resolve, reject) => {
+                    uploadXHR.onload = () => {
+                        if (uploadXHR.status >= 200 && uploadXHR.status < 300) {
+                            resolve();
+                        } else {
+                            reject(new Error(`R2 직접 업로드 실패 (Status: ${uploadXHR.status})`));
+                        }
+                    };
+                    uploadXHR.onerror = () => reject(new Error('네트워크 오류로 R2 업로드 실패'));
+                    uploadXHR.send(file);
                 });
 
-                if (!uploadResponse.ok) {
-                    const errorText = await uploadResponse.text();
-                    throw new Error(`R2 직접 업로드 실패 (Status: ${uploadResponse.status}, Error: ${errorText})`);
-                }
 
                 statusElement.innerHTML = `
                     <h3>✅ 업로드 성공!</h3>
